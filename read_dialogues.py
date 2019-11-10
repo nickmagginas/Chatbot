@@ -64,17 +64,3 @@ def prepare_data(filename):
     processed_pairs = process_pairs(filtered_pairs)
     return encode_corpus(processed_pairs, dictionary)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
