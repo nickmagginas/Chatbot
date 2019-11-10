@@ -1,74 +1,68 @@
 import json
 import string
-import torch
-# import matplotlib.pyplot as plt
 
 FILTER_LENGTH = 8
 
+### Function Composition
 compose = lambda f, g: lambda args: f(g(args))
+
+### JSON Parse and get Dialogue
 get_dialogue = lambda line: json.loads(line)['turns']
+
+### Length of sentence -- Helper --
+sentence_length = lambda s: len(s.split())
+
+### Flattens List -- Helper --
 flatten = lambda l: [qa for qal in l for qa in qal]
 
-def get_qa(filename):
-    return [*map(compose(construct_pairs, get_dialogue), open(filename, 'r'))]
-
+### Get a Dialogue and Construct Pairs
 def construct_pairs(d):
     return [(d[2*n], d[2*n + 1]) for n in range(d.__len__() // 2)]
 
-QA_PAIRS = flatten(get_qa('data/dialogues/AGREEMENT_BOT.txt'))
+### Read From file, compose and get QA pairs
+def get_qa(filename):
+    return [*map(compose(construct_pairs, get_dialogue), open(filename, 'r'))]
 
-qa_chain = ''.join([f'{q} {a} ' for (q, a) in QA_PAIRS])
-
-def remove_punctuation(s):
-    return s.translate({ord(key): None for key in string.punctuation})
-
-processed = map(lambda s: s.lower(), remove_punctuation(qa_chain).split())
-unique_words = set(processed)
-
-dictionary = {k: v for (k,v) in zip(unique_words, range(len(unique_words)))}
-
-sentence_length = lambda s: len(s.split())
-
-
+### Filter pairs than are smaller than CUTOFF
 def filter_pairs(qa_pairs, cutoff):
     pair_length = lambda p: all(l < cutoff for l in map(sentence_length, p))
     return filter(pair_length, qa_pairs)
 
-filtered_pairs = filter_pairs(QA_PAIRS, FILTER_LENGTH)
+### Remove any puntuation
+def remove_punctuation(s):
+    return s.translate({ord(key): None for key in string.punctuation})
 
-'''
-lengths = [*map(sentence_length, [s for qa in filtered_pairs for s in qa])]
+### Construct Vocabulary of Corpus
+def construct_vocabulary(pairs):
+    qa_chain = ''.join([f'{q} {a} ' for (q, a) in pairs])
+    processed = map(lambda s: s.lower(), remove_punctuation(qa_chain).split()) ### Lower-Case, Remove Punctuation
+    unique_words = set(processed)
+    dictionary = {k: v + 3 for (k,v) in zip(unique_words, range(len(unique_words)))} ### Map to Indexes
+    f_dictionary = {**{'PAD': 0, 'SOS': 1, 'EOS': 2}, **dictionary} ### Add PAD, SOS, EOS
+    return f_dictionary
 
-plt.hist(lengths, bins = 30)
-plt.show()
-'''
+### Encode
+def encode_sentence(s, dictionary):
+    encoded = [dictionary[word] for word in s.split()]
+    return [1] + encoded + [2]
 
-class Encoder(torch.nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(Encoder, self).__init__()
-        self.embedding = torch.nn.Embedding(input_size, hidden_size)
-        self.gru = torch.nn.GRU(hidden_size, hidden_size)
-
-    def forward(self, x, s):
-        embedding = self.embedding(x)
-        output, hidden = self.gru(x, s)
-        return output, hidden
-
-    @staticmethod
-    def init_state(hidden_size): return torch.zeros(1, 1, hidden_size)
-
-def transform_pair(pair, dictionary):
-    question, answer = pair
+### Encode Corpus
+def encode_corpus(pairs, dictionary):
+    return [tuple(map(lambda s: encode_sentence(s, dictionary), p)) for p in pairs]
 
 
-encoder = Encoder(8, 512)
-initial_state = encoder.init_state(512)
+### Lowercase remove punctuation
+def process_pairs(pairs):
+    process_sentence = lambda s: s.lower().translate({ord(i): None for i in string.punctuation})
+    return [tuple(map(process_sentence, p)) for p in pairs]
 
-
-
-
-
-
+### Compose module
+def prepare_data(filename):
+    qa_pairs = flatten(get_qa(filename))
+    filtered_pairs = [*filter_pairs(qa_pairs, FILTER_LENGTH)]
+    dictionary = construct_vocabulary(filtered_pairs)
+    processed_pairs = process_pairs(filtered_pairs)
+    return encode_corpus(processed_pairs, dictionary)
 
 
 
