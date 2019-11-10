@@ -11,11 +11,13 @@ class Decoder(torch.nn.Module):
         self.embedding = torch.nn.Embedding(output_size, hidden_size)
         self.gru = torch.nn.GRU(hidden_size, hidden_size)
         self.fc = torch.nn.Linear(hidden_size, output_size)
+        self.softmax = torch.nn.LogSoftmax(dim = 1)
 
     def forward(self, x, s):
         embedded = torch.nn.functional.relu(self.embedding(x))
         o, ns = self.gru(embedded, s)
-        return torch.nn.functional.softmax(o, dim = 1), ns
+        fco = self.fc(o[0])
+        return self.softmax(fco), ns
 
 def test():
     dictionary, pairs = reader.prepare_data(FILENAME)
@@ -25,7 +27,8 @@ def test():
     state = enc.feed_sentence(encoder, pairs[0][0], state, length)
     decoder = Decoder(HIDDEN_SIZE, length)
     x = pairs[0][1][3]
-    output, _ = decoder(torch.LongTensor([x]).view(1, 1), state)
-    print(output)
+    output, state = decoder(torch.LongTensor([x]).view(1, 1), state)
+    print(torch.argmax(output))
+
 
 test()
