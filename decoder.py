@@ -24,7 +24,8 @@ def test():
     state = encoder.init_state(HIDDEN_SIZE)
     state = enc.feed_sentence(encoder, pairs[0][0], state, length)
     decoder = Decoder(HIDDEN_SIZE, length)
-    x = enc.onehot(pairs[0][1][0], length)
-    output, _ = decoder(torch.LongTensor(x).view(length, 1), state)
+    x = pairs[0][1][3]
+    output, _ = decoder(torch.LongTensor([x]).view(1, 1), state)
+    print(output)
 
 test()
