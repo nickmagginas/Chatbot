@@ -9,7 +9,7 @@ def test():
     dictionary, pairs = reader.prepare_data(FILENAME)
     encoder = Encoder(dictionary.__len__(), HIDDEN_SIZE)
     state = encoder.init_state(HIDDEN_SIZE)
-    feed_sentence(encoder, pairs[0][0], state, dictionary.__len__())
+    state = feed_sentence(encoder, pairs[0][0], state, dictionary.__len__())
 
 ### Helper for OneHoting Words
 def onehot(word, length):
@@ -19,7 +19,7 @@ def onehot(word, length):
 def propagate_state(encoder, sentence, state, length):
     word = next(sentence)
     if word == 1: return propagate_state(encoder, sentence, state, length)
-    x = torch.LongTensor(onehot(word, length)).view(length, 1)
+    x = torch.LongTensor([word]).view(1,1)
     _, new_state = encoder.forward(x, state)
     call = lambda: propagate_state(encoder, sentence, new_state, length)
     return new_state if word == 2 else call()
