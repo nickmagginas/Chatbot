@@ -62,5 +62,22 @@ def prepare_data(filename):
     filtered_pairs = [*filter_pairs(qa_pairs, FILTER_LENGTH)]
     dictionary = construct_vocabulary(filtered_pairs)
     processed_pairs = process_pairs(filtered_pairs)
-    return encode_corpus(processed_pairs, dictionary)
+    return dictionary, encode_corpus(processed_pairs, dictionary)
+
+### Functions for Exporting ###
+
+### Reverse Dictionary for Faster Lookup
+def reverse_dictionary(dictionary):
+    return {value: key for key, value in dictionary.items()}
+
+### Translate from Indeces
+def translate(sentence, dictionary):
+    return [dictionary[i] for i in sentence]
+
+### Encode from Words
+def encode(sentence, dictionary):
+    return [dictionary[w] for w in sentence]
+
+
+
 
