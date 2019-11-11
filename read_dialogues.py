@@ -7,7 +7,7 @@ FILTER_LENGTH = 8
 compose = lambda f, g: lambda args: f(g(args))
 
 ### JSON Parse and get Dialogue
-get_dialogue = lambda line: json.loads(line)['turns']
+get_dialogue = lambda line: ['Hi'] + json.loads(line)['turns']
 
 ### Length of sentence -- Helper --
 sentence_length = lambda s: len(s.split())
@@ -79,5 +79,4 @@ def encode(sentence, dictionary):
     return [dictionary[w] for w in sentence]
 
 
-
-
+prepare_data('data/dialogues/AGREEMENT_BOT.txt')
