@@ -9,7 +9,8 @@ HIDDEN_SIZE = 512
 
 ### Main Training Routine
 def main(verbose = False):
-    dictionary, pairs = reader.prepare_data(FILENAME)
+    dictionary = reader.recover_dictionary('dictionary')
+    pairs = reader.encode_corpus(reader.create_pairs(FILENAME), dictionary)
     rev = reader.reverse_dictionary(dictionary)
     length = dictionary.__len__()
     encoder = e.Encoder(length, HIDDEN_SIZE)
