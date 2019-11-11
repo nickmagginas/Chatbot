@@ -1,10 +1,6 @@
-import encoder as enc
-import read_dialogues as reader
 import torch
 
-FILENAME = 'data/dialogues/AGREEMENT_BOT.txt'
-HIDDEN_SIZE = 512
-
+### Initial Decoder -- No Attention
 class Decoder(torch.nn.Module):
     def __init__(self, hidden_size, output_size):
         super(Decoder, self).__init__()
@@ -19,16 +15,15 @@ class Decoder(torch.nn.Module):
         fco = self.fc(o[0])
         return self.softmax(fco), ns
 
-def test():
-    dictionary, pairs = reader.prepare_data(FILENAME)
-    length = dictionary.__len__()
-    encoder = enc.Encoder(length, HIDDEN_SIZE)
-    state = encoder.init_state(HIDDEN_SIZE)
-    state = enc.feed_sentence(encoder, pairs[0][0], state, length)
-    decoder = Decoder(HIDDEN_SIZE, length)
-    x = pairs[0][1][3]
-    output, state = decoder(torch.LongTensor([x]).view(1, 1), state)
-    print(torch.argmax(output))
+def feed_forward(decoder, x, s, m_length, accumulator = []):
+    if accumulator == []:
+        nx, ns = decoder.forward(x, s)
+        return feed_forward(decoder, nx, ns, m_length, [nx])
+    if len(accumulator) >= m_length:
+        return accumulator
+    nx, ns = decoder.forward(torch.argmax(x).view(-1, 1), s)
+    return feed_forward(decoder, nx, ns, m_length, [nx] + accumulator)
 
 
-test()
+
+
