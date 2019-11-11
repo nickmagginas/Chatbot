@@ -1,33 +1,18 @@
-import read_dialogues as reader
 import torch
 
-FILENAME = 'data/dialogues/AGREEMENT_BOT.txt'
-HIDDEN_SIZE = 512
-
-### read data
-def test():
-    dictionary, pairs = reader.prepare_data(FILENAME)
-    encoder = Encoder(dictionary.__len__(), HIDDEN_SIZE)
-    state = encoder.init_state(HIDDEN_SIZE)
-    state = feed_sentence(encoder, pairs[0][0], state, dictionary.__len__())
-
-### Helper for OneHoting Words
-def onehot(word, length):
-    return [1 if i == word else 0 for i in range(length)]
-
 ### Propagate Recursively until EOS flag
-def propagate_state(encoder, sentence, state, length):
+def propagate_state(encoder, sentence, state):
     word = next(sentence)
-    if word == 1: return propagate_state(encoder, sentence, state, length)
+    if word == 1: return propagate_state(encoder, sentence, state)
     x = torch.LongTensor([word]).view(1,1)
     _, new_state = encoder.forward(x, state)
-    call = lambda: propagate_state(encoder, sentence, new_state, length)
+    call = lambda: propagate_state(encoder, sentence, new_state)
     return new_state if word == 2 else call()
 
 ### Feed to get encoding
-def feed_sentence(encoder, sentence, state, length):
+def feed_sentence(encoder, sentence, state):
     sentence_iter = iter(sentence)
-    state = propagate_state(encoder, sentence_iter, state, length)
+    state = propagate_state(encoder, sentence_iter, state)
     return state
 
 ### Encoder -- Embedding and GRU --
@@ -45,5 +30,3 @@ class Encoder(torch.nn.Module):
     def init_state(dimensions):
         return torch.zeros(1, 1, dimensions)
 
-if __name__ == '__main__':
-    test()
