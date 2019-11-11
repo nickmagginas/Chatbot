@@ -6,11 +6,6 @@ import torch
 FILENAME = 'data/dialogues/AGREEMENT_BOT.txt'
 HIDDEN_SIZE = 512
 
-onehot = lambda w, l: torch.Tensor([1 if w == 1 else 0 for i in range(l)])
-
-### One hot
-def prepare_for_loss(sentence, length):
-    return [onehot(w, length).view(-1, length) for w in sentence]
 
 ### Main Training Routine
 def main(verbose = False):
