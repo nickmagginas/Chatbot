@@ -1,7 +1,7 @@
 import json
 import string
 
-FILTER_LENGTH = 8
+FILTER_LENGTH = 15
 
 ### Function Composition
 compose = lambda f, g: lambda args: f(g(args))
@@ -50,7 +50,6 @@ def encode_sentence(s, dictionary):
 def encode_corpus(pairs, dictionary):
     return [tuple(map(lambda s: encode_sentence(s, dictionary), p)) for p in pairs]
 
-
 ### Lowercase remove punctuation
 def process_pairs(pairs):
     process_sentence = lambda s: s.lower().translate({ord(i): None for i in string.punctuation})
@@ -93,8 +92,4 @@ def translate(sentence, dictionary):
 ### Encode from Words
 def encode(sentence, dictionary):
     return [dictionary[w] for w in sentence]
-
-pairs = create_pairs('data/dialogues/AGREEMENT_BOT.txt')
-dictionary = construct_vocabulary(pairs)
-store_dictionary(dictionary)
 
