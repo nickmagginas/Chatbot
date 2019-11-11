@@ -24,6 +24,14 @@ def feed_forward(decoder, x, s, m_length, accumulator = []):
     nx, ns = decoder.forward(torch.argmax(x).view(-1, 1), s)
     return feed_forward(decoder, nx, ns, m_length, [nx] + accumulator)
 
+def feed_forward_test(decoder, x, s, accumulator = []):
+    if accumulator == []:
+        nx, ns = decoder.forward(x, s)
+        return feed_forward_test(decoder, nx, ns, [torch.argmax(nx).item()])
+    if torch.argmax(x).item() == 2: return accumulator
+    nx, ns = decoder.forward(torch.argmax(x).view(-1, 1), s)
+    return feed_forward_test(decoder, nx, ns, [torch.argmax(nx).item()] + accumulator)
+
 
 
 
