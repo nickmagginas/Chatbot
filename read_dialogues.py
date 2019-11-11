@@ -56,19 +56,35 @@ def process_pairs(pairs):
     process_sentence = lambda s: s.lower().translate({ord(i): None for i in string.punctuation})
     return [tuple(map(process_sentence, p)) for p in pairs]
 
+### Get and filter pairs
+def create_pairs(filename):
+    qa_pairs = flatten(get_qa(filename))
+    filtered_pairs = [*filter_pairs(qa_pairs, FILTER_LENGTH)]
+    return process_pairs(filtered_pairs)
+
 ### Compose module
-def prepare_data(filename):
+def prepare_data(filename, encode = False):
     qa_pairs = flatten(get_qa(filename))
     filtered_pairs = [*filter_pairs(qa_pairs, FILTER_LENGTH)]
     dictionary = construct_vocabulary(filtered_pairs)
-    processed_pairs = process_pairs(filtered_pairs)
-    return dictionary, encode_corpus(processed_pairs, dictionary)
+    if encode:
+        processed_pairs = process_pairs(filtered_pairs)
+        return dictionary, encode_corpus(processed_pairs, dictionary)
+    return dictionary
+
+### Store dictionary
+def store_dictionary(dictionary):
+    json.dump(dictionary, open('dictionary', 'w'))
 
 ### Functions for Exporting ###
 
 ### Reverse Dictionary for Faster Lookup
 def reverse_dictionary(dictionary):
     return {value: key for key, value in dictionary.items()}
+
+### Recover Dictionary
+def recover_dictionary(filename):
+    return json.load(open(filename, 'r'))
 
 ### Translate from Indeces
 def translate(sentence, dictionary):
@@ -78,5 +94,7 @@ def translate(sentence, dictionary):
 def encode(sentence, dictionary):
     return [dictionary[w] for w in sentence]
 
+pairs = create_pairs('data/dialogues/AGREEMENT_BOT.txt')
+dictionary = construct_vocabulary(pairs)
+store_dictionary(dictionary)
 
-prepare_data('data/dialogues/AGREEMENT_BOT.txt')
