@@ -49,6 +49,7 @@ def encode_pair(pair, dictionary):
 
 encoded_pairs = [*map(lambda p: encode_pair(p, reverse_dictionary), pairs)]
 
+### Move to Tensor Data and GPU if available
 def prepare_pairs(pairs):
 	tensorize = lambda s: torch.tensor(s, dtype = torch.long, device = DEVICE).view(-1, 1)
 	return [tuple(map(tensorize, pair)) for pair in pairs]
@@ -56,6 +57,7 @@ def prepare_pairs(pairs):
 final_pairs = prepare_pairs(encoded_pairs)
 input_size = dictionary.__len__()
 
+### Vanilla Encoder with Embedding Layer
 class Encoder(torch.nn.Module):
 	def __init__(self, input_size, hidden_size):
 		super(Encoder, self).__init__()
@@ -69,6 +71,7 @@ class Encoder(torch.nn.Module):
 	@staticmethod
 	def __init_hidden__(hidden_size): return torch.zeros(1, 1, hidden_size, device = DEVICE)
 
+### Vannila Decoder with Embedding Layer -- To Add Attention
 class Decoder(torch.nn.Module):
 	def __init__(self, hidden_size, output_size):
 		super(Decoder, self).__init__()
@@ -83,6 +86,7 @@ class Decoder(torch.nn.Module):
 		fc = self.fc(output)
 		return self.softmax(fc), hidden
 
+### Main training routine
 def train(pairs, iterations):
 	encoder = Encoder(input_size, HIDDEN_SIZE).to(DEVICE)
 	encoder_state = encoder.__init_hidden__(HIDDEN_SIZE)
@@ -109,8 +113,7 @@ def train(pairs, iterations):
 
 	return encoder, decoder
 
-	
-
+### Calculate Loss for single QA Pair
 def pair_loss(pair, encoder, decoder, encoder_state, loss_function):
 	pair_loss = 0
 	question, target = pair
@@ -125,6 +128,7 @@ def pair_loss(pair, encoder, decoder, encoder_state, loss_function):
 
 	return pair_loss
 
+### For Test Feed Question get answer
 def get_answer(encoder, decoder, question, encoder_state):
 	iterable_question = iter((lambda s: torch.tensor(s, dtype = torch.long).view(-1, 1))(question))
 	encoder_state = propagate_encoder_state(encoder, iterable_question, encoder_state)
@@ -139,7 +143,7 @@ def get_answer(encoder, decoder, question, encoder_state):
 			break
 	return answer
 
-
+### Propagate the state to get final encoding
 def propagate_encoder_state(encoder, sentence, state):
 	try: word = next(sentence)
 	except StopIteration: return state
@@ -154,6 +158,7 @@ decoder = Decoder(HIDDEN_SIZE, input_size)
 encoder.load_state_dict(torch.load('encoder'))
 decoder.load_state_dict(torch.load('decoder'))
 
+### Simple Eval Loop for Conversing
 def eval_loop():
 	while True:
 		q = input('Q: ')
