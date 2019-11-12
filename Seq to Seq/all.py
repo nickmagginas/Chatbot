@@ -1,35 +1,52 @@
 import json
 import torch
+import string
 import random
 
-FILENAME = '../data/dialogues/AGREEMENT_BOT.txt'
-HIDDEN_SIZE = 256 
+FILENAMES = ['../data/dialogues/AGREEMENT_BOT.txt', '../data/dialogues/ALARM_SET.txt', '../data/dialogues/BUS_SCHEDULE_BOT']
+HIDDEN_SIZE = 512
 LEARNING_RATE = 0.005
+MAX_LENGTH = 15
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 ### Flatten List
 flatten = lambda l: [s for e in l for s in e]
 
-### JSON parse and prepend Greeting
-def read_file():
-	return [['Hi'] + json.loads(line)['turns'] for line in open(FILENAME, 'r')]
+def normalize_sentence(s):
+	return ''.join([*map(lambda w: w.translate({ord(i): None for i in string.punctuation}).lower(), s)])
 
-original_lines = read_file()
+### JSON parse and prepend Greeting
+def read_file(filename):
+	return [['Hi'] + json.loads(line)['turns'] for line in open(filename, 'r')]
+
+original_lines = read_file(FILENAMES[0]) + read_file(FILENAMES[1]) + read_file(FILENAMES[2])
 lines = flatten(original_lines)
+normalized_lines = [*map(normalize_sentence, lines)]
 
 ### Set of unique words -- Does not retain order between module calls
-unique_words = set(flatten([line.split() for line in lines]))
+unique_words = set(flatten([line.split() for line in normalized_lines]))
 
 ### Lookup Index -- Index to Word
 dictionary = {**{0: 'SOS', 1: 'EOS'}, **{key + 2: value for key, value in enumerate(unique_words)}} 
 
+json.dump(dictionary, open('dictionary', 'w'))
+### dictionary = json.load(open('dictionary', 'r'))
+
 ### Lookup Words -- Words to Index
 reverse_dictionary = {value: key for key, value in dictionary.items()} 
 
+def filter_pair(pair):
+	question, answer = pair
+	return len(question) < MAX_LENGTH and len(answer) < MAX_LENGTH
+
+### Filter length
+def filter_pairs(pairs):
+	return [*filter(filter_pair, pairs)]
+
 ### Built Pairs out of dialogue
 def construct_pair(line):
-	return [(line[2*i], line[2*i + 1] + ' EOS') for i in range(len(line) // 2)]
+	return [(normalize_sentence(line[2*i]), normalize_sentence(line[2*i + 1]) + ' EOS') for i in range(len(line) // 2)]
 
 def construct_pairs(lines):
 	return [*map(construct_pair, lines)]
@@ -54,7 +71,7 @@ def prepare_pairs(pairs):
 	tensorize = lambda s: torch.tensor(s, dtype = torch.long, device = DEVICE).view(-1, 1)
 	return [tuple(map(tensorize, pair)) for pair in pairs]
 
-final_pairs = prepare_pairs(encoded_pairs)
+final_pairs = filter_pairs(prepare_pairs(encoded_pairs))
 input_size = dictionary.__len__()
 
 ### Vanilla Encoder with Embedding Layer
@@ -98,6 +115,7 @@ def train(pairs, iterations):
 	decoder_optimizer = torch.optim.SGD(decoder.parameters(), lr = LEARNING_RATE)
 
 	loss_function = torch.nn.NLLLoss()
+
 	for i in range(iterations):
 		pair = random.choice(pairs)
 		encoder_optimizer.zero_grad()
@@ -106,7 +124,7 @@ def train(pairs, iterations):
 		loss.backward()
 		encoder_optimizer.step() 
 		decoder_optimizer.step()
-		print(f'Iteration: {i}, Loss: {loss.item()}')
+		print(f'Iteration: {i} , Loss: {loss.item()}')
 
 	torch.save(encoder.state_dict(), 'encoder')
 	torch.save(decoder.state_dict(), 'decoder')
@@ -125,6 +143,9 @@ def pair_loss(pair, encoder, decoder, encoder_state, loss_function):
 		decoder_output, decoder_state = decoder(decoder_input, decoder_state)
 		decoder_input = torch.argmax(decoder_output, dim = 2).detach()
 		pair_loss += loss_function(decoder_output.view(1, -1), target_word)
+
+		if decoder_input.item() == 2:
+			break
 
 	return pair_loss
 
@@ -151,7 +172,7 @@ def propagate_encoder_state(encoder, sentence, state):
 	return propagate_encoder_state(encoder, sentence, next_state)
 
 
-encoder, decoder = train(final_pairs, 10000)
+encoder, decoder = train(final_pairs, 100000)
 
 encoder = Encoder(input_size, HIDDEN_SIZE)
 decoder = Decoder(HIDDEN_SIZE, input_size)
@@ -161,12 +182,14 @@ decoder.load_state_dict(torch.load('decoder'))
 ### Simple Eval Loop for Conversing
 def eval_loop():
 	while True:
-		q = input('Q: ')
-		encoded = encode_sentence(q, reverse_dictionary)
-		answer = get_answer(encoder, decoder, encoded, encoder.__init_hidden__(HIDDEN_SIZE))
-		print(decoder_sentence(answer, dictionary))
+		q = normalize_sentence(input('Q: '))
+		try: 
+			encoded = encode_sentence(q, reverse_dictionary)
+			answer = get_answer(encoder, decoder, encoded, encoder.__init_hidden__(HIDDEN_SIZE).to(torch.device('cpu')))
+			print(decode_sentence(answer, dictionary))
+		except KeyError: print('I have never seen something like this before')
 
-
+	
 eval_loop()
 
 
