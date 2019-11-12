@@ -6,6 +6,8 @@ FILENAME = '../data/dialogues/AGREEMENT_BOT.txt'
 HIDDEN_SIZE = 256 
 LEARNING_RATE = 0.005
 
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 ### Flatten List
 flatten = lambda l: [s for e in l for s in e]
 
@@ -34,6 +36,9 @@ def construct_pairs(lines):
 
 pairs = flatten(construct_pairs(original_lines))
 
+def decode_sentence(sentence, dictionary):
+	return [dictionary[index] for index in sentence]
+
 ### Encode Sentence need reverse dictionary -- Words to Index
 def encode_sentence(sentence, dictionary):
 	return [dictionary[word] for word in sentence.split()]
@@ -45,7 +50,7 @@ def encode_pair(pair, dictionary):
 encoded_pairs = [*map(lambda p: encode_pair(p, reverse_dictionary), pairs)]
 
 def prepare_pairs(pairs):
-	tensorize = lambda s: torch.tensor(s, dtype = torch.long).view(-1, 1)
+	tensorize = lambda s: torch.tensor(s, dtype = torch.long, device = DEVICE).view(-1, 1)
 	return [tuple(map(tensorize, pair)) for pair in pairs]
 
 final_pairs = prepare_pairs(encoded_pairs)
@@ -62,7 +67,7 @@ class Encoder(torch.nn.Module):
 		return self.gru(embedded, s)
 
 	@staticmethod
-	def __init_hidden__(hidden_size): return torch.zeros(1, 1, hidden_size)
+	def __init_hidden__(hidden_size): return torch.zeros(1, 1, hidden_size, device = DEVICE)
 
 class Decoder(torch.nn.Module):
 	def __init__(self, hidden_size, output_size):
@@ -79,10 +84,10 @@ class Decoder(torch.nn.Module):
 		return self.softmax(fc), hidden
 
 def train(pairs, iterations):
-	encoder = Encoder(input_size, HIDDEN_SIZE)
+	encoder = Encoder(input_size, HIDDEN_SIZE).to(DEVICE)
 	encoder_state = encoder.__init_hidden__(HIDDEN_SIZE)
 
-	decoder = Decoder(HIDDEN_SIZE, input_size)
+	decoder = Decoder(HIDDEN_SIZE, input_size).to(DEVICE)
 
 
 	encoder_optimizer = torch.optim.SGD(encoder.parameters(), lr = LEARNING_RATE)
@@ -99,6 +104,9 @@ def train(pairs, iterations):
 		decoder_optimizer.step()
 		print(f'Iteration: {i}, Loss: {loss.item()}')
 
+	torch.save(encoder.state_dict(), 'encoder')
+	torch.save(decoder.state_dict(), 'decoder')
+
 	return encoder, decoder
 
 	
@@ -108,7 +116,7 @@ def pair_loss(pair, encoder, decoder, encoder_state, loss_function):
 	question, target = pair
 	iterable_question = iter(question)
 	encoder_state = propagate_encoder_state(encoder, iterable_question, encoder_state)
-	decoder_input = torch.tensor([[0]])
+	decoder_input = torch.tensor([[0]], device = DEVICE)
 	decoder_state = encoder_state
 	for target_word in target:
 		decoder_output, decoder_state = decoder(decoder_input, decoder_state)
@@ -132,7 +140,6 @@ def get_answer(encoder, decoder, question, encoder_state):
 	return answer
 
 
-
 def propagate_encoder_state(encoder, sentence, state):
 	try: word = next(sentence)
 	except StopIteration: return state
@@ -142,11 +149,18 @@ def propagate_encoder_state(encoder, sentence, state):
 
 encoder, decoder = train(final_pairs, 10000)
 
+encoder = Encoder(input_size, HIDDEN_SIZE)
+decoder = Decoder(HIDDEN_SIZE, input_size)
+encoder.load_state_dict(torch.load('encoder'))
+decoder.load_state_dict(torch.load('decoder'))
+
 def eval_loop():
 	while True:
 		q = input('Q: ')
 		encoded = encode_sentence(q, reverse_dictionary)
-		print(get_answer(encoder, decoder, encoded, encoder.__init_hidden__(HIDDEN_SIZE)))
+		answer = get_answer(encoder, decoder, encoded, encoder.__init_hidden__(HIDDEN_SIZE))
+		print(decoder_sentence(answer, dictionary))
+
 
 eval_loop()
 
