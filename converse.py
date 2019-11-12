@@ -2,12 +2,11 @@ import read_dialogues as r
 import torch
 import encoder as e
 import decoder as d
-import train
 
-HIDDEN_SIZE = 512
+HIDDEN_SIZE = 256
 
 def forward(encoder, decoder, question):
-    state = encoder.init_state(512)
+    state = encoder.init_state(256)
     encoded_state = e.feed_sentence(encoder, question, state)
     SOS_TOKEN = torch.LongTensor([1]).view(-1, 1)
     output = d.feed_forward_test(decoder, SOS_TOKEN, encoded_state)
@@ -15,7 +14,6 @@ def forward(encoder, decoder, question):
 
 
 def converse_loop(encoder, decoder, dictionary):
-    encoder, decoder = train.main()
     q = input('Your Go: \n')
     filtered_question = r.remove_punctuation(q).lower()
     encoded_question = r.encode_sentence(filtered_question, dictionary)
@@ -25,6 +23,9 @@ def converse_loop(encoder, decoder, dictionary):
 
 
 dictionary = r.recover_dictionary('dictionary')
-
-converse_loop(1, 2, dictionary)
+encoder = e.Encoder(dictionary.__len__(), HIDDEN_SIZE)
+decoder = d.Decoder(HIDDEN_SIZE, dictionary.__len__())
+encoder.load_state_dict(torch.load('encoder'))
+decoder.load_state_dict(torch.load('decoder'))
+converse_loop(encoder, decoder, dictionary)
 
