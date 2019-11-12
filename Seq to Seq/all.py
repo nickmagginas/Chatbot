@@ -3,10 +3,11 @@ import torch
 import string
 import random
 
-FILENAMES = ['../data/dialogues/AGREEMENT_BOT.txt', '../data/dialogues/ALARM_SET.txt', '../data/dialogues/BUS_SCHEDULE_BOT']
+FILENAMES = ['../data/dialogues/AGREEMENT_BOT.txt', '../data/dialogues/ALARM_SET.txt', '../data/dialogues/BUS_SCHEDULE_BOT.txt']
 HIDDEN_SIZE = 512
 LEARNING_RATE = 0.005
 MAX_LENGTH = 15
+MIN_LENGTH = 3
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -18,9 +19,9 @@ def normalize_sentence(s):
 
 ### JSON parse and prepend Greeting
 def read_file(filename):
-	return [['Hi'] + json.loads(line)['turns'] for line in open(filename, 'r')]
+	return [['Hi robot lord'] + json.loads(line)['turns'] for line in open(filename, 'r')]
 
-original_lines = read_file(FILENAMES[0]) + read_file(FILENAMES[1]) + read_file(FILENAMES[2])
+original_lines = read_file(FILENAMES[0])
 lines = flatten(original_lines)
 normalized_lines = [*map(normalize_sentence, lines)]
 
@@ -38,7 +39,7 @@ reverse_dictionary = {value: key for key, value in dictionary.items()}
 
 def filter_pair(pair):
 	question, answer = pair
-	return len(question) < MAX_LENGTH and len(answer) < MAX_LENGTH
+	return MIN_LENGTH < len(question) < MAX_LENGTH and MIN_LENGTH < len(answer) < MAX_LENGTH
 
 ### Filter length
 def filter_pairs(pairs):
@@ -93,13 +94,21 @@ class Decoder(torch.nn.Module):
 	def __init__(self, hidden_size, output_size):
 		super(Decoder, self).__init__()
 		self.embedding = torch.nn.Embedding(output_size, hidden_size)
+		self.attention = torch.nn.Linear(2 * hidden_size, MAX_LENGTH)
+		self.combine = torch.nn.Linear(2 * hidden_size, hidden_size)
 		self.gru = torch.nn.GRU(hidden_size, hidden_size)
 		self.fc = torch.nn.Linear(hidden_size, output_size)
+		self.attention_softmax = torch.nn.Softmax(dim = 1)
 		self.softmax = torch.nn.LogSoftmax(dim = 2)
 
-	def forward(self, x, s):
+	def forward(self, x, s, encoder_outputs):
 		embedded = torch.nn.functional.relu(self.embedding(x))
-		output, hidden = self.gru(embedded, s)
+		scores = self.attention(torch.cat((embedded[0], s[0]), 1))
+		normalized_scores = self.attention_softmax(scores)
+		attention = torch.bmm(normalized_scores.unsqueeze(0), encoder_outputs.unsqueeze(0))
+		focused_state = self.combine(torch.cat((embedded[0], attention[0]), 1)).unsqueeze(0)
+		activated_focus = torch.nn.functional.relu(focused_state)
+		output, hidden = self.gru(activated_focus, s)
 		fc = self.fc(output)
 		return self.softmax(fc), hidden
 
@@ -115,6 +124,7 @@ def train(pairs, iterations):
 	decoder_optimizer = torch.optim.SGD(decoder.parameters(), lr = LEARNING_RATE)
 
 	loss_function = torch.nn.NLLLoss()
+	accumulated_loss = 0
 
 	for i in range(iterations):
 		pair = random.choice(pairs)
@@ -124,7 +134,10 @@ def train(pairs, iterations):
 		loss.backward()
 		encoder_optimizer.step() 
 		decoder_optimizer.step()
-		print(f'Iteration: {i} , Loss: {loss.item()}')
+		accumulated_loss += loss.item()
+		if i % 1000 == 0 and i != 0:
+			print(f'Iteration: {i / 1000} , Loss: {accumulated_loss / 1000}')
+			accumulated_loss = 0
 
 	torch.save(encoder.state_dict(), 'encoder')
 	torch.save(decoder.state_dict(), 'decoder')
@@ -136,11 +149,19 @@ def pair_loss(pair, encoder, decoder, encoder_state, loss_function):
 	pair_loss = 0
 	question, target = pair
 	iterable_question = iter(question)
-	encoder_state = propagate_encoder_state(encoder, iterable_question, encoder_state)
+	encoder_state, outputs = propagate_encoder_state(encoder, iterable_question, encoder_state)
+	encoder_outputs = torch.zeros((MAX_LENGTH, 1, HIDDEN_SIZE), device = DEVICE)
+	try: encoder_outputs[:len(outputs)] = torch.cat(outputs)
+	except:
+		print(question)
+		print(outputs)
+		print(outputs.__len__()) 
+		print(outputs[0].shape)
+	encoder_outputs = encoder_outputs.squeeze(1)
 	decoder_input = torch.tensor([[0]], device = DEVICE)
 	decoder_state = encoder_state
 	for target_word in target:
-		decoder_output, decoder_state = decoder(decoder_input, decoder_state)
+		decoder_output, decoder_state = decoder(decoder_input, decoder_state, encoder_outputs)
 		decoder_input = torch.argmax(decoder_output, dim = 2).detach()
 		pair_loss += loss_function(decoder_output.view(1, -1), target_word)
 
@@ -152,7 +173,7 @@ def pair_loss(pair, encoder, decoder, encoder_state, loss_function):
 ### For Test Feed Question get answer
 def get_answer(encoder, decoder, question, encoder_state):
 	iterable_question = iter((lambda s: torch.tensor(s, dtype = torch.long).view(-1, 1))(question))
-	encoder_state = propagate_encoder_state(encoder, iterable_question, encoder_state)
+	encoder_state, encoder_outputs = propagate_encoder_state(encoder, iterable_question, encoder_state)
 	decoder_input = torch.tensor([[0]])
 	decoder_state = encoder_state
 	answer = []
@@ -165,11 +186,11 @@ def get_answer(encoder, decoder, question, encoder_state):
 	return answer
 
 ### Propagate the state to get final encoding
-def propagate_encoder_state(encoder, sentence, state):
+def propagate_encoder_state(encoder, sentence, state, accumulator = []):
 	try: word = next(sentence)
-	except StopIteration: return state
-	_, next_state = encoder(word, state)
-	return propagate_encoder_state(encoder, sentence, next_state)
+	except StopIteration: return state, accumulator
+	output, next_state = encoder(word, state)
+	return propagate_encoder_state(encoder, sentence, next_state, accumulator + [output])
 
 
 encoder, decoder = train(final_pairs, 100000)
