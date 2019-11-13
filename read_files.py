@@ -31,16 +31,20 @@ def get_unique_words(pairs):
     all_words = flatten([q.split() + a.split() for (q, a) in pairs])
     return [word for i, word in enumerate(all_words) if word not in all_words[i + 1:]]
 
-def create_dataset(filename):
+def encode_pairs(pairs, dictionary):
+    return [*map(lambda p: tuple(map(lambda s: encode_sentence(s, dictionary), p)), pairs)]
+
+def create_dataset(filename, create_dictionary = True):
     dialogues = read_file(filename)
     pairs = get_pairs(dialogues)
     filtered_pairs = filter_pairs(pairs)
     normalized_pairs = normalize_pairs(filtered_pairs)
-    unique_words = get_unique_words(normalized_pairs)
-    dictionary = {key: value + 2 for value, key in enumerate(unique_words)}
-    return pairs, {**{'SOS': 1, 'EOS': 2}, **dictionary}
-
-
+    if create_dictionary:
+        unique_words = get_unique_words(normalized_pairs)
+        dictionary = {key: value + 2 for value, key in enumerate(unique_words)}
+        encoded_pairs = encode_pairs(normalized_pairs, dictionary)
+        return encoded_pairs, {**{'SOS': 1, 'EOS': 2}, **dictionary}
+    return pairs
 
 #################################################################################################
 
@@ -52,3 +56,7 @@ def encode_sentence(sentence, dictionary):
 
 def decode_sentence(sentence, reverse):
     return [reverse[index] for index in sentence]
+
+def pair_dimensions(q, a):
+    return (len(q), len(a))
+
