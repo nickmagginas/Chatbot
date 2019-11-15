@@ -1,5 +1,6 @@
 import json
 import string
+import os
 
 MIN_LENGTH = 3
 MAX_LENGTH = 10
@@ -31,6 +32,14 @@ def get_unique_words(pairs):
     all_words = flatten([q.split() + a.split() for (q, a) in pairs])
     return [word for i, word in enumerate(all_words) if word not in all_words[i + 1:]]
 
+def get_unique_words_fast(pairs):
+    all_words = flatten([q.split() + a.split() for (q, a) in pairs])
+    unique_words = []
+    for word in all_words:
+        if word not in unique_words:
+            unique_words.append(word)
+    return unique_words
+
 def encode_pairs(pairs, dictionary):
     return [*map(lambda p: tuple(map(lambda s: encode_sentence(s, dictionary), p)), pairs)]
 
@@ -41,10 +50,23 @@ def create_dataset(filename, create_dictionary = True):
     normalized_pairs = normalize_pairs(filtered_pairs)
     if create_dictionary:
         unique_words = get_unique_words(normalized_pairs)
-        dictionary = {key: value + 2 for value, key in enumerate(unique_words)}
+        dictionary = {key: value + 2 for value, key in enumerate(reversed(unique_words))}
         encoded_pairs = encode_pairs(normalized_pairs, dictionary)
-        return encoded_pairs, {**{'SOS': 1, 'EOS': 2}, **dictionary}
-    return pairs
+        final_pairs = [*map(lambda p: (p[0], p[1] + [1]), encoded_pairs)]
+        return final_pairs, {**{'SOS': 0, 'EOS': 1}, **dictionary}
+    return normalized_pairs
+
+def create_whole_corpus():
+    filenames = map(lambda f: f'data/dialogues/{f}', os.listdir('data/dialogues'))
+    pairs = flatten(map(lambda f: create_dataset(f, create_dictionary = False), filenames))
+    print('Created Pairs')
+    unique_words = get_unique_words_fast(pairs)
+    dictionary = {key: value for value, key in enumerate(unique_words)}
+    print('Creted Dictionary')
+    encoded_pairs = encode_pairs(pairs, dictionary)
+    print('Encoded Pairs')
+    final_pairs = [*map(lambda p: (p[0], p[1] + [1]), encoded_pairs)]
+    return final_pairs, {**{'SOS': 0, 'EOS': 1}, **dictionary}
 
 #################################################################################################
 
