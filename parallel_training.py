@@ -2,15 +2,12 @@ import read_files as r
 import torch
 from encoder import Encoder
 from decoder import Decoder
-from time import sleep
 
 LEARNING_RATE = 0.01
 HIDDEN_SIZE = 512
 BATCH_SIZE = 512
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
 
 transpose = lambda t: torch.transpose(t, 0, 1)
 
@@ -44,7 +41,7 @@ def training_iteration(encoder, decoder, encoder_optimizer, decoder_optimizer, l
     iteration_loss = 0
     for parallel_pairs in parallel_training(pairs):
         if parallel_pairs == []: continue
-        batch_number  = len(parallel_pairs) // BATCH_SIZE 
+        batch_number = len(parallel_pairs) // BATCH_SIZE
         if len(parallel_pairs) < BATCH_SIZE:
             sequence_size = len(parallel_pairs)
             questions, answers = tuple(map(list, zip(*parallel_pairs)))
@@ -72,7 +69,7 @@ def training_iteration(encoder, decoder, encoder_optimizer, decoder_optimizer, l
 
     return iteration_loss
 
-def train():
+def train(recover = False):
     pairs, dictionary = r.create_whole_corpus()
     print(f'Number of pairs: {len(pairs)}')
     encoder = Encoder(dictionary.__len__(), HIDDEN_SIZE).to(DEVICE)
@@ -80,8 +77,9 @@ def train():
     encoder_optimizer = torch.optim.SGD(encoder.parameters(), LEARNING_RATE)
     decoder_optimizer = torch.optim.SGD(decoder.parameters(), LEARNING_RATE)
     loss_function = torch.nn.NLLLoss()
-    encoder.load_state_dict(torch.load('encoder'))
-    decoder.load_state_dict(torch.load('decoder'))
+    if recover:
+        encoder.load_state_dict(torch.load('encoder'))
+        decoder.load_state_dict(torch.load('decoder'))
     for i in range(1000):
         loss = training_iteration(encoder, decoder, encoder_optimizer, decoder_optimizer, loss_function, pairs)
         print(f'Iteration: {i}, Loss: {loss}')
@@ -89,19 +87,10 @@ def train():
             print('Saving Models')
             torch.save(encoder.state_dict(), 'encoder')
             torch.save(decoder.state_dict(), 'decoder')
-    
+
     torch.save(encoder.state_dict(), 'encoder')
     torch.save(decoder.state_dict(), 'decoder')
-    
 
-train()
 
-'''
-    for output_index in range(output_length):
-        output, decoder_state = decoder(decoder_start_tokens, decoder_state)
-        target = answers[output_index]
-        loss(output.squeeze(0), target)
-        predictions = torch.argmax(output, dim = 2)
-        break
-    break
-'''
+if __name__ == '__main__': train()
+
