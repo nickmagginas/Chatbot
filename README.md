@@ -10,4 +10,5 @@
 #### Codebase was tested on Ubuntu 18.04, Python 3 and PyTroch 1.0.1.post2. No Windows Compatability is expected
 #### Sources:
 https://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html
+
 https://pytorch.org/docs/stable/nn.html
