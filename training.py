@@ -3,6 +3,11 @@ import torch
 from encoder import Encoder
 from decoder import Decoder
 
+
+#########################################################
+## For documentation parallel_training is very similar ##
+#########################################################
+
 LEARNING_RATE = 0.01
 HIDDEN_SIZE = 512
 

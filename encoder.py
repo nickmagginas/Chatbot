@@ -1,5 +1,6 @@
 import torch
 
+### A GRU based encoder
 class Encoder(torch.nn.Module):
     def __init__(self, input_size, hidden_size):
         super(Encoder, self).__init__()

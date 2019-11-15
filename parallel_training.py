@@ -11,17 +11,18 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 transpose = lambda t: torch.transpose(t, 0, 1)
 
+### returns pairs matching each possible dimension
 def parallel_training(pairs):
     dimension_range = range(r.MIN_LENGTH, r.MAX_LENGTH + 1)
     for dimension in [(ql, al) for ql in dimension_range for al in dimension_range]:
         yield [*filter(lambda p: r.pair_dimensions(*p) == dimension , pairs)]
 
+### forward encoder to get summary of input sequence
 def propagate_encoder(encoder, questions, sequence_size):
     questions = transpose(torch.tensor(questions, dtype = torch.long, device = DEVICE))
     return encoder(questions, encoder.__init_hidden__(HIDDEN_SIZE).repeat(1, sequence_size, 1).to(DEVICE))
 
-loss_function = torch.nn.NLLLoss()
-
+### propagate though the decoder to calculate loss
 def propagate_decoder(decoder, answers, output, decoder_state, loss_function, accumulator = 0):
     try: target = next(answers)
     except StopIteration: return accumulator
@@ -30,6 +31,7 @@ def propagate_decoder(decoder, answers, output, decoder_state, loss_function, ac
     forward_outputs, update_state = decoder(forward_inputs, decoder_state)
     return propagate_decoder(decoder, answers, forward_outputs, update_state, loss_function, accumulator + loss)
 
+### Update encoder-decoder parameters
 def training_update(encoder_optimizer, decoder_optimizer, loss):
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -37,6 +39,7 @@ def training_update(encoder_optimizer, decoder_optimizer, loss):
     encoder_optimizer.step()
     decoder_optimizer.step()
 
+### For each dimension get the pairs with exactly that dimension. Create batches feed to encoder and decoder
 def training_iteration(encoder, decoder, encoder_optimizer, decoder_optimizer, loss_function, pairs):
     iteration_loss = 0
     for parallel_pairs in parallel_training(pairs):
@@ -69,6 +72,7 @@ def training_iteration(encoder, decoder, encoder_optimizer, decoder_optimizer, l
 
     return iteration_loss
 
+### create objects and train. Autosaves every 20 iterations of the corpus
 def train(recover = False):
     pairs, dictionary = r.create_whole_corpus()
     print(f'Number of pairs: {len(pairs)}')
@@ -90,7 +94,6 @@ def train(recover = False):
 
     torch.save(encoder.state_dict(), 'encoder')
     torch.save(decoder.state_dict(), 'decoder')
-
 
 if __name__ == '__main__': train()
 
