@@ -16,22 +16,37 @@ https://pytorch.org/docs/stable/nn.html
 ## Sample Conversations:
 #### Initial Training
 Q: Hi 
+
 A: Hello how may i help you
+
 Q: I am god
+
 A: Yes you are the the
+
 Q: Thank you
+
 A: Have a a
+
 Q: You are bad
+
 A: I agree
+
 Q: I am the programmer
+
 A: Yes you are the person
 
 #### Final Training
 Q: Hi Mr Robot
+
 A: How may I help you
+
 Q: I am god
 A: You are
+
 Q: I can have anything I want
+
 A: You can
+
 Q: Are you always this agreeable?
+
 A: I am aggreable yes
